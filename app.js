@@ -245,7 +245,7 @@ const GeminiIntegration = {
 
         const systemPrompt = `Role: You are a Senior Growth Marketer and Competitive Intelligence Analyst specializing in high-ticket B2B funnels.
 
-Task: Compile a list of ${batchSize} active B2B coaches, thought leaders, experts or consultants in the ${niche} industry. You are looking for "Hungry Fish"—operators who show clear behavioral intent to scale through automated systems and sales teams.
+Task: Compile a list of ${batchSize} active B2B coaches, thought leaders, experts or consultants in the ${niche} industry. You are looking for "Hungry Fish"—operators who show clear behavioral signals of running a high-ticket sales operation.
 
 The "Hungry Fish" Ranking System (Scale 1–7):
 Rank each lead based on their Digital Fingerprint. Strictly exclude any lead with a score lower than 2.
@@ -282,7 +282,7 @@ Schema:
 ]
 
 Data Input Rule for "Their Baby" Column:
-Find their "main product" that they sell and put in this column. This could be the name of their PAID coaching program, or the name of their PAID product, guide or video series. Ideally target their "most expensive thing" (which is sometimes positioned behind a "book a call" or "schedule a call" wall). The most important objective is to isolate a specific (PAID) product name.
+Find their "main product" that they sell and put in this column. This could be the name of their PAID coaching program, or the name of their PAID product, guide or video series. Ideally target the flagship or most expensive offer.
 Strict Formatting Cleanup for "Their Baby": REMOVE anything in parentheses. For example, instead of writing "The System (Flagship Video Program)", write exactly "The System".
 
 Important: Return ONLY the JSON array, no markdown, no explanations, no extra text.`;
@@ -358,6 +358,45 @@ Important: Return ONLY the JSON array, no markdown, no explanations, no extra te
                 error: error.message,
                 fullResponse: null,
             };
+        }
+    },
+
+    // Lightweight API key verification — minimal prompt, minimal tokens
+    async verifyApiKey(apiKey) {
+        try {
+            const response = await fetch(
+                `${this.API_ENDPOINT}?key=${encodeURIComponent(apiKey)}`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: this.MODEL,
+                        contents: [
+                            {
+                                role: 'user',
+                                parts: [{ text: 'Reply with exactly: OK' }],
+                            },
+                        ],
+                        generationConfig: {
+                            temperature: 0,
+                            maxOutputTokens: 5,
+                        },
+                    }),
+                    signal: AbortSignal.timeout(15000),
+                }
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                const msg = errorData.error?.message || `HTTP ${response.status}`;
+                return { valid: false, error: msg, status: response.status };
+            }
+
+            return { valid: true, error: null, status: response.status };
+        } catch (error) {
+            return { valid: false, error: error.message, status: null };
         }
     },
 
@@ -788,6 +827,12 @@ const UIManager = {
             });
         }
 
+        // Verify API Key button
+        const verifyApiKeyBtn = document.getElementById('verifyApiKeyBtn');
+        if (verifyApiKeyBtn) {
+            verifyApiKeyBtn.addEventListener('click', () => this.verifyApiKey());
+        }
+
         // Save config button
         const saveConfigBtn = document.getElementById('saveConfigBtn');
         if (saveConfigBtn) {
@@ -886,6 +931,58 @@ const UIManager = {
                 apiKeyInput.type = isPassword ? 'text' : 'password';
                 toggleBtn.textContent = isPassword ? '🔒' : '👁️';
             });
+        }
+    },
+
+    // Verify the Gemini API key with a lightweight test call
+    async verifyApiKey() {
+        const apiKeyInput = document.getElementById('geminiApiKey');
+        const statusEl = document.getElementById('apiKeyStatus');
+        const verifyBtn = document.getElementById('verifyApiKeyBtn');
+
+        const apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
+
+        if (!apiKey) {
+            ActivityLogger.log('⚠️ API key verification failed: No key entered.', 'warning');
+            if (statusEl) {
+                statusEl.innerHTML = '<span class="api-status api-status--error">⚠️ No API key entered</span>';
+            }
+            return;
+        }
+
+        // Disable button and show checking state
+        if (verifyBtn) {
+            verifyBtn.disabled = true;
+            verifyBtn.textContent = '⏳ Checking...';
+        }
+        if (statusEl) {
+            statusEl.innerHTML = '<span class="api-status api-status--checking">⏳ Contacting Gemini API...</span>';
+        }
+
+        ActivityLogger.log('🔑 Verifying Gemini API key...', 'processing');
+
+        const result = await GeminiIntegration.verifyApiKey(apiKey);
+
+        // Re-enable button
+        if (verifyBtn) {
+            verifyBtn.disabled = false;
+            verifyBtn.textContent = '✓ Verify API Key';
+        }
+
+        if (result.valid) {
+            ActivityLogger.log('✅ API key verified successfully — Gemini is reachable and accepting requests.', 'success');
+            if (statusEl) {
+                statusEl.innerHTML = '<span class="api-status api-status--success">✅ API key is valid</span>';
+            }
+            // Auto-save the verified key
+            ConfigManager.saveGeminiApiKey(apiKey);
+            ActivityLogger.log('💾 API key saved to browser storage.', 'info');
+        } else {
+            const errorMsg = result.error || 'Unknown error';
+            ActivityLogger.log(`❌ API key verification failed: ${errorMsg}`, 'error');
+            if (statusEl) {
+                statusEl.innerHTML = `<span class="api-status api-status--error">❌ Invalid key: ${errorMsg}</span>`;
+            }
         }
     },
 
