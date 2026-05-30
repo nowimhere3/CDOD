@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B2B Lead Generation & Enrichment Engine</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>🎯 B2B Lead Generation & Enrichment Engine</h1>
+                <p class="subtitle">Part One: Lead Search & Sourcing Layer</p>
+            </div>
+        </header>
+
+        <!-- Main Content Grid -->
+        <div class="content-grid">
+            <!-- Left Panel: Configuration -->
+            <div class="panel config-panel">
+                <div class="panel-header">
+                    <h2>⚙️ Configuration</h2>
+                </div>
+                <div class="panel-body">
+                    <div class="form-group">
+                        <label for="geminiApiKey">Gemini API Key</label>
+                        <div class="input-wrapper">
+                            <input 
+                                type="password" 
+                                id="geminiApiKey" 
+                                placeholder="Enter your Gemini API key"
+                                class="form-input"
+                            >
+                            <button id="toggleApiKeyVisibility" class="toggle-btn" title="Toggle visibility">👁️</button>
+                        </div>
+                        <small class="hint">Loaded from .env or localStorage</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="targetNiche">Target Niche Keyword</label>
+                        <input 
+                            type="text" 
+                            id="targetNiche" 
+                            placeholder="e.g., High-Ticket B2B Coaching"
+                            class="form-input"
+                        >
+                        <small class="hint">Industry or niche vertical</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="targetLeads">Target Total Leads</label>
+                        <input 
+                            type="number" 
+                            id="targetLeads" 
+                            placeholder="120"
+                            min="1"
+                            max="1000"
+                            value="50"
+                            class="form-input"
+                        >
+                        <small class="hint">Max 1000 leads per session</small>
+                    </div>
+
+                    <div class="batch-info">
+                        <p><strong>Batch Calculation:</strong></p>
+                        <p id="batchCalculation" class="batch-text">Enter target leads to calculate</p>
+                    </div>
+
+                    <button id="startBtn" class="btn btn-primary">
+                        <span class="btn-icon">▶️</span>
+                        [ Start ]
+                    </button>
+
+                    <button id="saveConfigBtn" class="btn btn-secondary">
+                        💾 Save Config
+                    </button>
+
+                    <button id="clearHistoryBtn" class="btn btn-danger">
+                        🗑️ Clear History
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Panel: Activity Log & Results -->
+            <div class="panel output-panel">
+                <div class="panel-header">
+                    <h2>📊 Activity Log & Results</h2>
+                    <button id="clearLogBtn" class="btn btn-small">Clear Log</button>
+                </div>
+                <div id="activityLog" class="activity-log">
+                    <div class="log-entry log-info">
+                        System ready. Configure settings and click [Start] to begin lead sourcing.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div class="results-section">
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>📋 Harvested Leads</h2>
+                    <div class="results-controls">
+                        <span id="leadCount" class="lead-count">0 leads</span>
+                        <button id="exportCsvBtn" class="btn btn-small" disabled>📥 Export CSV</button>
+                        <button id="exportJsonBtn" class="btn btn-small" disabled>📥 Export JSON</button>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div id="resultsTable" class="results-table-wrapper">
+                        <p class="placeholder-text">No leads harvested yet. Start the process to see results.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Built with vanilla JS, HTML5, CSS3 | Part One: Lead Sourcing Layer</p>
+            <p><small>Data stored locally in browser. No external tracking.</small></p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
