@@ -203,6 +203,12 @@ code {
     gap: var(--spacing-md);
 }
 
+.log-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
 .lead-count {
     font-weight: 600;
     color: var(--primary);
@@ -356,6 +362,17 @@ button {
     background-color: #fecaca;
 }
 
+.btn-info {
+    background-color: var(--info-bg);
+    color: var(--info);
+    width: 100%;
+    margin-bottom: var(--spacing-md);
+}
+
+.btn-info:hover:not(:disabled) {
+    background-color: #bfdbfe;
+}
+
 .btn-small {
     padding: var(--spacing-sm) var(--spacing-md);
     font-size: var(--font-size-sm);
@@ -374,6 +391,43 @@ button {
 
 .btn-icon {
     font-size: 1.2em;
+}
+
+/* ============================================================================
+   API KEY STATUS
+   ============================================================================ */
+
+.api-status-placeholder {
+    min-height: 20px;
+    margin-bottom: var(--spacing-md);
+}
+
+.api-status {
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--spacing-md);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.api-status.success {
+    background-color: var(--success-bg);
+    color: var(--success);
+    border: 1px solid var(--success);
+}
+
+.api-status.error {
+    background-color: var(--error-bg);
+    color: var(--error);
+    border: 1px solid var(--error);
+}
+
+.api-status.validating {
+    background-color: var(--warning-bg);
+    color: var(--warning);
+    border: 1px solid var(--warning);
 }
 
 /* ============================================================================
@@ -603,6 +657,15 @@ button {
     .results-table td {
         padding: var(--spacing-sm);
     }
+
+    .log-controls {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .log-controls .btn-small {
+        width: 100%;
+    }
 }
 
 @media (max-width: 480px) {
@@ -633,6 +696,15 @@ button {
 
     .activity-log {
         height: 250px;
+    }
+
+    .log-controls {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .log-controls .btn-small {
+        width: 100%;
     }
 }
 
