@@ -38,6 +38,11 @@
                         <small class="hint">Loaded from .env or localStorage</small>
                     </div>
 
+                    <button id="verifyApiKeyBtn" class="btn btn-info">
+                        ✓ Verify API Key
+                    </button>
+                    <div id="apiKeyStatus" class="api-status-placeholder"></div>
+
                     <div class="form-group">
                         <label for="targetNiche">Target Niche Keyword</label>
                         <input 
@@ -87,7 +92,10 @@
             <div class="panel output-panel">
                 <div class="panel-header">
                     <h2>📊 Activity Log & Results</h2>
-                    <button id="clearLogBtn" class="btn btn-small">Clear Log</button>
+                    <div class="log-controls">
+                        <button id="copyLogBtn" class="btn btn-small" title="Copy entire log to clipboard">📋 Copy Log</button>
+                        <button id="clearLogBtn" class="btn btn-small">Clear Log</button>
+                    </div>
                 </div>
                 <div id="activityLog" class="activity-log">
                     <div class="log-entry log-info">
