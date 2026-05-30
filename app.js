@@ -601,6 +601,19 @@ const ActivityLogger = {
         logContainer.scrollTop = logContainer.scrollHeight;
     },
 
+    // Build a clean plain-text representation of all log entries
+    toPlainText() {
+        return this.logEntries
+            .map(entry => {
+                let line = `[${entry.timestamp}] [${entry.type.toUpperCase()}] ${entry.message}`;
+                if (entry.data) {
+                    line += `  ${JSON.stringify(entry.data)}`;
+                }
+                return line;
+            })
+            .join('\n');
+    },
+
     clear() {
         this.logEntries = [];
         this.displayLog();
@@ -833,6 +846,12 @@ const UIManager = {
             verifyApiKeyBtn.addEventListener('click', () => this.verifyApiKey());
         }
 
+        // Copy log button
+        const copyLogBtn = document.getElementById('copyLogBtn');
+        if (copyLogBtn) {
+            copyLogBtn.addEventListener('click', () => this.copyLog(copyLogBtn));
+        }
+
         // Save config button
         const saveConfigBtn = document.getElementById('saveConfigBtn');
         if (saveConfigBtn) {
@@ -931,6 +950,34 @@ const UIManager = {
                 apiKeyInput.type = isPassword ? 'text' : 'password';
                 toggleBtn.textContent = isPassword ? '🔒' : '👁️';
             });
+        }
+    },
+
+    // Copy the full activity log to the clipboard as plain text
+    async copyLog(btn) {
+        const logText = ActivityLogger.toPlainText();
+
+        if (!logText.trim()) {
+            ActivityLogger.log('⚠️ Nothing to copy — the log is empty.', 'warning');
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(logText);
+
+            // Brief visual confirmation on the button
+            const originalText = btn.textContent;
+            btn.textContent = '✅ Copied!';
+            btn.disabled = true;
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }, 2000);
+
+            ActivityLogger.log(`📋 Activity log copied to clipboard (${ActivityLogger.logEntries.length} entries).`, 'success');
+        } catch (err) {
+            // Fallback for browsers that block clipboard API (e.g. non-HTTPS)
+            ActivityLogger.log(`❌ Could not copy to clipboard: ${err.message}`, 'error');
         }
     },
 
