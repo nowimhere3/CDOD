@@ -235,8 +235,10 @@ const BatchCalculator = {
 // ============================================================================
 
 const GeminiIntegration = {
-    API_ENDPOINT: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent',
-    MODEL: 'gemini-1.5-pro',
+    MODEL: 'gemini-2.0-flash',
+    get API_ENDPOINT() {
+        return `https://generativelanguage.googleapis.com/v1beta/models/${this.MODEL}:generateContent`;
+    },
     REQUEST_TIMEOUT_MS: 60000,
 
     // Build the master sourcing prompt with dynamic context injection
@@ -290,7 +292,7 @@ Important: Return ONLY the JSON array, no markdown, no explanations, no extra te
         return systemPrompt;
     },
 
-    // Call Gemini API with streaming support
+    // Call Gemini API
     async callGeminiAPI(apiKey, prompt) {
         try {
             const response = await fetch(
@@ -301,7 +303,6 @@ Important: Return ONLY the JSON array, no markdown, no explanations, no extra te
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        model: this.MODEL,
                         contents: [
                             {
                                 role: 'user',
@@ -372,7 +373,6 @@ Important: Return ONLY the JSON array, no markdown, no explanations, no extra te
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        model: this.MODEL,
                         contents: [
                             {
                                 role: 'user',
@@ -1006,7 +1006,7 @@ const UIManager = {
             statusEl.innerHTML = '<span class="api-status api-status--checking">⏳ Contacting Gemini API...</span>';
         }
 
-        ActivityLogger.log('🔑 Verifying Gemini API key...', 'processing');
+        ActivityLogger.log(`🔑 Verifying Gemini API key (model: ${GeminiIntegration.MODEL})...`, 'processing');
 
         const result = await GeminiIntegration.verifyApiKey(apiKey);
 
@@ -1017,7 +1017,7 @@ const UIManager = {
         }
 
         if (result.valid) {
-            ActivityLogger.log('✅ API key verified successfully — Gemini is reachable and accepting requests.', 'success');
+            ActivityLogger.log(`✅ API key verified successfully — ${GeminiIntegration.MODEL} is reachable and accepting requests.`, 'success');
             if (statusEl) {
                 statusEl.innerHTML = '<span class="api-status api-status--success">✅ API key is valid</span>';
             }
