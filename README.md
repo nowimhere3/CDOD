@@ -32,7 +32,7 @@ Browser (HTML/CSS/JS)
         │  GET        /api/health
         ▼
 Express Backend (server.js)
-        │  ****** token>
+        │  Authorization: ADC access token
         ▼
 Google Gemini REST API
 ```
@@ -112,7 +112,7 @@ If it fails, check the server console for the exact ADC/auth error message.
    - Used to contextualise AI search queries
 
 2. **Set Target Total Leads**
-   - Maximum 1 000 leads per session
+   - Maximum 1000 leads per session
    - System auto-calculates required batches
    - Example: 120 leads = 3 batches (50 + 50 + 20)
 
