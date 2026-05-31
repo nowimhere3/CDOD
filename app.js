@@ -41,26 +41,6 @@
 // ============================================================================
 
 const ConfigManager = {
-    // Load Gemini API key from env or localStorage
-    async loadGeminiApiKey() {
-        try {
-            // Check if running in Node-like environment with .env
-            if (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) {
-                return process.env.GEMINI_API_KEY;
-            }
-        } catch (e) {
-            // Browser environment, ignore
-        }
-
-        // Check localStorage
-        return localStorage.getItem('gemini_api_key') || '';
-    },
-
-    saveGeminiApiKey(key) {
-        localStorage.setItem('gemini_api_key', key);
-        return true;
-    },
-
     loadTargetNiche() {
         return localStorage.getItem('target_niche') || '';
     },
@@ -82,7 +62,6 @@ const ConfigManager = {
 
     getAllConfig() {
         return {
-            geminiApiKey: this.loadGeminiApiKey(),
             targetNiche: this.loadTargetNiche(),
             targetLeads: this.loadTargetLeads(),
         };
@@ -90,8 +69,6 @@ const ConfigManager = {
 
     isConfigValid(config) {
         return (
-            config.geminiApiKey &&
-            config.geminiApiKey.trim().length > 0 &&
             config.targetNiche &&
             config.targetNiche.trim().length > 0 &&
             config.targetLeads &&
@@ -236,9 +213,8 @@ const BatchCalculator = {
 
 const GeminiIntegration = {
     MODEL: 'gemini-2.0-flash',
-    get API_ENDPOINT() {
-        return `https://generativelanguage.googleapis.com/v1beta/models/${this.MODEL}:generateContent`;
-    },
+    BACKEND_GENERATE: '/api/generate',
+    BACKEND_HEALTH: '/api/health',
     REQUEST_TIMEOUT_MS: 60000,
 
     // Build the master sourcing prompt with dynamic context injection
@@ -292,65 +268,26 @@ Important: Return ONLY the JSON array, no markdown, no explanations, no extra te
         return systemPrompt;
     },
 
-    // Call Gemini API
-    async callGeminiAPI(apiKey, prompt) {
+    // Call the backend proxy which authenticates to Gemini via ADC
+    async callGeminiAPI(prompt) {
         try {
-            const response = await fetch(
-                `${this.API_ENDPOINT}?key=${encodeURIComponent(apiKey)}`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        contents: [
-                            {
-                                role: 'user',
-                                parts: [
-                                    {
-                                        text: prompt,
-                                    },
-                                ],
-                            },
-                        ],
-                        generationConfig: {
-                            temperature: 0.7,
-                            topK: 40,
-                            topP: 0.95,
-                            maxOutputTokens: 4096,
-                        },
-                    }),
-                    signal: AbortSignal.timeout(this.REQUEST_TIMEOUT_MS),
-                }
-            );
+            const response = await fetch(this.BACKEND_GENERATE, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt }),
+                signal: AbortSignal.timeout(this.REQUEST_TIMEOUT_MS),
+            });
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(
-                    `Gemini API Error (${response.status}): ${
-                        errorData.error?.message || 'Unknown error'
-                    }`
-                );
+                throw new Error(errorData.error || `Backend error (${response.status})`);
             }
 
             const data = await response.json();
 
-            // Extract text from response
-            let textContent = '';
-            if (
-                data.candidates &&
-                data.candidates[0] &&
-                data.candidates[0].content &&
-                data.candidates[0].content.parts
-            ) {
-                textContent = data.candidates[0].content.parts
-                    .map(part => part.text || '')
-                    .join('');
-            }
-
             return {
                 success: true,
-                rawText: textContent,
+                rawText: data.rawText,
                 fullResponse: data,
             };
         } catch (error) {
@@ -362,39 +299,21 @@ Important: Return ONLY the JSON array, no markdown, no explanations, no extra te
         }
     },
 
-    // Lightweight API key verification — minimal prompt, minimal tokens
-    async verifyApiKey(apiKey) {
+    // Verify backend connectivity and ADC credentials
+    async verifyBackendConnection() {
         try {
-            const response = await fetch(
-                `${this.API_ENDPOINT}?key=${encodeURIComponent(apiKey)}`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        contents: [
-                            {
-                                role: 'user',
-                                parts: [{ text: 'Reply with exactly: OK' }],
-                            },
-                        ],
-                        generationConfig: {
-                            temperature: 0,
-                            maxOutputTokens: 5,
-                        },
-                    }),
-                    signal: AbortSignal.timeout(15000),
-                }
-            );
+            const response = await fetch(this.BACKEND_HEALTH, {
+                signal: AbortSignal.timeout(15000),
+            });
 
             if (!response.ok) {
                 const errorData = await response.json();
-                const msg = errorData.error?.message || `HTTP ${response.status}`;
+                const msg = errorData.error || `HTTP ${response.status}`;
                 return { valid: false, error: msg, status: response.status };
             }
 
-            return { valid: true, error: null, status: response.status };
+            const data = await response.json();
+            return { valid: true, model: data.model, error: null, status: response.status };
         } catch (error) {
             return { valid: false, error: error.message, status: null };
         }
@@ -686,11 +605,8 @@ const ExecutionEngine = {
                     exclusionList
                 );
 
-                // Call Gemini API
-                const apiResult = await GeminiIntegration.callGeminiAPI(
-                    config.geminiApiKey,
-                    systemPrompt
-                );
+                // Call Gemini API via backend proxy
+                const apiResult = await GeminiIntegration.callGeminiAPI(systemPrompt);
 
                 if (!apiResult.success) {
                     ActivityLogger.log(`❌ Batch ${batch.batchNumber} failed: ${apiResult.error}`, 'error');
@@ -794,16 +710,12 @@ const UIManager = {
         // Load saved configuration
         const savedNiche = ConfigManager.loadTargetNiche();
         const savedLeads = ConfigManager.loadTargetLeads();
-        const savedApiKey = await ConfigManager.loadGeminiApiKey();
 
         if (document.getElementById('targetNiche')) {
             document.getElementById('targetNiche').value = savedNiche;
         }
         if (document.getElementById('targetLeads')) {
             document.getElementById('targetLeads').value = savedLeads;
-        }
-        if (document.getElementById('geminiApiKey')) {
-            document.getElementById('geminiApiKey').value = savedApiKey;
         }
 
         this.attachEventListeners();
@@ -817,12 +729,7 @@ const UIManager = {
             startBtn.addEventListener('click', () => {
                 const targetNiche = document.getElementById('targetNiche').value.trim();
                 const targetLeads = parseInt(document.getElementById('targetLeads').value, 10);
-                const apiKey = document.getElementById('geminiApiKey').value.trim();
 
-                if (!apiKey) {
-                    alert('Please enter your Gemini API Key');
-                    return;
-                }
                 if (!targetNiche) {
                     alert('Please enter a target niche');
                     return;
@@ -832,7 +739,6 @@ const UIManager = {
                     return;
                 }
 
-                ConfigManager.saveGeminiApiKey(apiKey);
                 ConfigManager.saveTargetNiche(targetNiche);
                 ConfigManager.saveTargetLeads(targetLeads);
 
@@ -840,10 +746,10 @@ const UIManager = {
             });
         }
 
-        // Verify API Key button
-        const verifyApiKeyBtn = document.getElementById('verifyApiKeyBtn');
-        if (verifyApiKeyBtn) {
-            verifyApiKeyBtn.addEventListener('click', () => this.verifyApiKey());
+        // Verify Backend Connection button
+        const verifyBackendBtn = document.getElementById('verifyBackendBtn');
+        if (verifyBackendBtn) {
+            verifyBackendBtn.addEventListener('click', () => this.verifyBackendConnection());
         }
 
         // Copy log button
@@ -856,11 +762,9 @@ const UIManager = {
         const saveConfigBtn = document.getElementById('saveConfigBtn');
         if (saveConfigBtn) {
             saveConfigBtn.addEventListener('click', () => {
-                const apiKey = document.getElementById('geminiApiKey').value.trim();
                 const targetNiche = document.getElementById('targetNiche').value.trim();
                 const targetLeads = parseInt(document.getElementById('targetLeads').value, 10);
 
-                if (apiKey) ConfigManager.saveGeminiApiKey(apiKey);
                 if (targetNiche) ConfigManager.saveTargetNiche(targetNiche);
                 if (targetLeads) ConfigManager.saveTargetLeads(targetLeads);
 
@@ -940,17 +844,6 @@ const UIManager = {
             targetLeadsInput.addEventListener('change', () => this.updateBatchCalculation());
             targetLeadsInput.addEventListener('input', () => this.updateBatchCalculation());
         }
-
-        // API Key visibility toggle
-        const toggleBtn = document.getElementById('toggleApiKeyVisibility');
-        const apiKeyInput = document.getElementById('geminiApiKey');
-        if (toggleBtn && apiKeyInput) {
-            toggleBtn.addEventListener('click', () => {
-                const isPassword = apiKeyInput.type === 'password';
-                apiKeyInput.type = isPassword ? 'text' : 'password';
-                toggleBtn.textContent = isPassword ? '🔒' : '👁️';
-            });
-        }
     },
 
     // Copy the full activity log to the clipboard as plain text
@@ -981,21 +874,10 @@ const UIManager = {
         }
     },
 
-    // Verify the Gemini API key with a lightweight test call
-    async verifyApiKey() {
-        const apiKeyInput = document.getElementById('geminiApiKey');
+    // Verify backend connectivity and Google Cloud ADC credentials
+    async verifyBackendConnection() {
         const statusEl = document.getElementById('apiKeyStatus');
-        const verifyBtn = document.getElementById('verifyApiKeyBtn');
-
-        const apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
-
-        if (!apiKey) {
-            ActivityLogger.log('⚠️ API key verification failed: No key entered.', 'warning');
-            if (statusEl) {
-                statusEl.innerHTML = '<span class="api-status api-status--error">⚠️ No API key entered</span>';
-            }
-            return;
-        }
+        const verifyBtn = document.getElementById('verifyBackendBtn');
 
         // Disable button and show checking state
         if (verifyBtn) {
@@ -1003,32 +885,29 @@ const UIManager = {
             verifyBtn.textContent = '⏳ Checking...';
         }
         if (statusEl) {
-            statusEl.innerHTML = '<span class="api-status api-status--checking">⏳ Contacting Gemini API...</span>';
+            statusEl.innerHTML = '<span class="api-status api-status--checking">⏳ Contacting backend...</span>';
         }
 
-        ActivityLogger.log(`🔑 Verifying Gemini API key (model: ${GeminiIntegration.MODEL})...`, 'processing');
+        ActivityLogger.log('🔌 Verifying backend connection and Google Cloud credentials...', 'processing');
 
-        const result = await GeminiIntegration.verifyApiKey(apiKey);
+        const result = await GeminiIntegration.verifyBackendConnection();
 
         // Re-enable button
         if (verifyBtn) {
             verifyBtn.disabled = false;
-            verifyBtn.textContent = '✓ Verify API Key';
+            verifyBtn.textContent = '🔌 Verify Backend Connection';
         }
 
         if (result.valid) {
-            ActivityLogger.log(`✅ API key verified successfully — ${GeminiIntegration.MODEL} is reachable and accepting requests.`, 'success');
+            ActivityLogger.log(`✅ Backend connected — model ${result.model || GeminiIntegration.MODEL} is reachable.`, 'success');
             if (statusEl) {
-                statusEl.innerHTML = '<span class="api-status api-status--success">✅ API key is valid</span>';
+                statusEl.innerHTML = '<span class="api-status api-status--success">✅ Backend connected</span>';
             }
-            // Auto-save the verified key
-            ConfigManager.saveGeminiApiKey(apiKey);
-            ActivityLogger.log('💾 API key saved to browser storage.', 'info');
         } else {
             const errorMsg = result.error || 'Unknown error';
-            ActivityLogger.log(`❌ API key verification failed: ${errorMsg}`, 'error');
+            ActivityLogger.log(`❌ Backend connection failed: ${errorMsg}`, 'error');
             if (statusEl) {
-                statusEl.innerHTML = `<span class="api-status api-status--error">❌ Invalid key: ${errorMsg}</span>`;
+                statusEl.innerHTML = `<span class="api-status api-status--error">❌ Connection failed: ${errorMsg}</span>`;
             }
         }
     },
