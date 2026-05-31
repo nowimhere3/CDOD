@@ -2,7 +2,9 @@
 
 **Part One: Lead Search & Sourcing Layer**
 
-A production-ready, serverless B2B lead generation system built with vanilla JavaScript, HTML5, and CSS3. Integrates with Google Gemini AI to identify and score high-intent B2B coaches, thought leaders, and consultants using the "Hungry Fish" qualification framework.
+A production-ready B2B lead generation system built with vanilla JavaScript, HTML5, CSS3, and a minimal Node.js/Express backend.  It integrates with Google Gemini AI (via Google Cloud ADC) to identify and score high-intent B2B coaches, thought leaders, and consultants using the "Hungry Fish" qualification framework.
+
+> **Google Cloud org users:** this app no longer uses browser-side API keys.  Authentication is handled server-side via Application Default Credentials (ADC) or a service-account key, which is compatible with Google Cloud org policies that disallow plain API keys.
 
 ---
 
@@ -10,7 +12,7 @@ A production-ready, serverless B2B lead generation system built with vanilla Jav
 
 ### Core Functionality
 - **Dynamic Batch Calculation**: Automatically calculates sequential API batches (max 50 leads/batch)
-- **Gemini AI Integration**: Uses Google Gemini 1.5 Pro for intelligent lead sourcing
+- **Gemini AI Integration**: Uses Google Gemini 2.0 Flash for intelligent lead sourcing
 - **Global History Log**: Prevents AI amnesia with persistent, keyword-indexed lead tracking
 - **Automatic Deduplication**: Final pass removes duplicates across all batches
 - **Exhaustion Detection**: Halts execution when no new qualified leads are found
@@ -20,74 +22,102 @@ A production-ready, serverless B2B lead generation system built with vanilla Jav
 - **Real-time Activity Log**: Live stream of processing events
 - **Results Table**: Clean display of harvested leads with intent scores
 - **Export Options**: Download leads as CSV or JSON
-- **Config Persistence**: Saves settings to browser localStorage
+- **Config Persistence**: Saves niche & lead-count settings to browser localStorage
 - **Responsive Design**: Works on desktop, tablet, and mobile
 
-### Architectural Layers
-1. **Configuration Manager** - API keys, niche, target leads
-2. **History & Deduplication Manager** - Global history log with exclusion lists
-3. **Batch Calculation Engine** - Math.ceil batch logic
-4. **Gemini AI Integration Layer** - API calls with dynamic prompt injection
-5. **Results Aggregation & Export** - Combines, deduplicates, exports results
-6. **UI Event Manager & Activity Logger** - User interactions and logging
+### Architecture
+```
+Browser (HTML/CSS/JS)
+        │  HTTP POST /api/generate
+        │  GET        /api/health
+        ▼
+Express Backend (server.js)
+        │  Authorization: ADC access token
+        ▼
+Google Gemini REST API
+```
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Modern web browser (Chrome, Firefox, Safari, Edge)
-- Google Gemini API key (get one free at [aistudio.google.com](https://aistudio.google.com/app/apikeys))
+- **Node.js ≥ 18** (uses native `fetch`)
+- A **Google Cloud project** with the **Generative Language API** (or **Vertex AI**) enabled
+- **Google Cloud SDK** (`gcloud`) installed — or a service-account JSON key
 
-### Installation
+### 1 — Clone the repo
+```bash
+git clone https://github.com/nowimhere3/CDOD.git
+cd CDOD
+```
 
-1. **Clone or download the repository:**
-   ```bash
-   git clone https://github.com/nowimhere3/CDOD.git
-   cd CDOD
-   ```
+### 2 — Install dependencies
+```bash
+npm install
+```
 
-2. **Set up environment (optional for local development):**
-   ```bash
-   cp .env.example .env
-   # Edit .env and add your Gemini API key
-   ```
+### 3 — Authenticate with Google Cloud
 
-3. **Run locally:**
-   - Option A: Open `index.html` directly in your browser
-   - Option B: Use a local server (recommended):
-     ```bash
-     # Python 3
-     python -m http.server 8000
-     
-     # Or Node.js with http-server
-     npx http-server
-     ```
-   - Then visit `http://localhost:8000` in your browser
+**Option A — Developer workstation (recommended)**
+```bash
+gcloud auth application-default login
+```
+Follow the browser prompt.  Credentials are stored in `~/.config/gcloud/`.
+
+**Option B — Service-account key file**
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+```
+Or add it to a `.env` file (see step 4).
+
+**Option C — Deployed on Google Cloud (Cloud Run, GCE, GKE, etc.)**
+No extra steps — ADC is picked up automatically from the instance metadata service.
+
+### 4 — Configure environment (optional)
+```bash
+cp .env.example .env
+# Edit .env to change PORT, GEMINI_MODEL, or GOOGLE_APPLICATION_CREDENTIALS
+```
+
+### 5 — Start the server
+```bash
+npm start
+```
+You should see:
+```
+✅ Server running on http://localhost:3000
+   Model : gemini-2.0-flash
+   Auth  : Application Default Credentials (ADC)
+```
+
+### 6 — Open the app
+Navigate to **http://localhost:3000** in your browser.
+
+Click **🔌 Verify Backend Connection** to confirm the server can reach Gemini before starting a session.
 
 ---
 
 ## 📖 Usage Guide
 
-### Step 1: Configure Settings
+### Step 1: Verify the connection
+Click **🔌 Verify Backend Connection** to confirm that the backend can authenticate with Google Cloud and reach the Gemini API.
 
-1. **Enter Gemini API Key**
-   - Get your key from [aistudio.google.com/app/apikeys](https://aistudio.google.com/app/apikeys)
-   - Key is saved securely in browser localStorage
-   - Can also load from `.env` file during development
+If it fails, check the server console for the exact ADC/auth error message.
 
-2. **Specify Target Niche**
+### Step 2: Configure settings
+
+1. **Specify Target Niche**
    - Examples: "High-Ticket B2B Coaching", "SaaS Founders", "Digital Marketing Agencies"
-   - Used to contextualize AI search queries
+   - Used to contextualise AI search queries
 
-3. **Set Target Total Leads**
+2. **Set Target Total Leads**
    - Maximum 1000 leads per session
    - System auto-calculates required batches
    - Example: 120 leads = 3 batches (50 + 50 + 20)
 
-### Step 2: Start Lead Sourcing
-
-1. Click **[ Start ]** button
+### Step 3: Start lead sourcing
+1. Click **[ Start ]**
 2. Watch the Activity Log for real-time progress
 3. System will:
    - Load historical exclusions for the keyword
@@ -96,22 +126,54 @@ A production-ready, serverless B2B lead generation system built with vanilla Jav
    - Log all activity with timestamps
    - Halt on exhaustion signal
 
-### Step 3: Review & Export Results
+### Step 4: Review & export results
+- **View Harvested Leads** — colour-coded intent scores (red=1-2, orange=3-4, green=5-7)
+- **Export CSV** — spreadsheet import (Google Sheets, Excel)
+- **Export JSON** — programmatic use
+- **Clear History** — reset lead history for a keyword
 
-1. **View Harvested Leads**
-   - Results table shows all discovered leads
-   - Color-coded intent scores (red=1-2, orange=3-4, green=5-7)
-   - Sortable columns with key information
+---
 
-2. **Export Data**
-   - Click **📥 Export CSV** for spreadsheet import (Google Sheets, Excel)
-   - Click **📥 Export JSON** for programmatic use
-   - Includes all fields: name, company, intent score, product, etc.
+## ☁️ Google Cloud Setup (detailed)
 
-3. **Manage History**
-   - Previous results persist in browser storage
-   - Click **🗑️ Clear History** to reset for a keyword
-   - System automatically excludes previously found leads in new batches
+### Enable the Generative Language API
+```bash
+gcloud services enable generativelanguage.googleapis.com \
+  --project=YOUR_PROJECT_ID
+```
+
+### Create a service account (for server/CI deployments)
+```bash
+# Create the service account
+gcloud iam service-accounts create cdod-lead-gen \
+  --display-name="CDOD Lead Gen" \
+  --project=YOUR_PROJECT_ID
+
+# Grant it permission to call the Gemini API
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+  --member="serviceAccount:cdod-lead-gen@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
+  --role="roles/aiplatform.user"
+
+# Download the key file
+gcloud iam service-accounts keys create service-account.json \
+  --iam-account=cdod-lead-gen@YOUR_PROJECT_ID.iam.gserviceaccount.com
+```
+
+Then set:
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+npm start
+```
+
+### Deploy to Cloud Run (optional)
+```bash
+gcloud run deploy cdod-lead-gen \
+  --source . \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --project YOUR_PROJECT_ID
+```
+Cloud Run automatically uses the service's ADC — no key file needed.
 
 ---
 
@@ -136,8 +198,6 @@ Each lead is scored 1-7 based on digital fingerprint signals:
 
 ## 📊 Data Schema
 
-Each lead record includes:
-
 ```json
 {
   "fullName": "John Doe",
@@ -154,80 +214,51 @@ Each lead record includes:
 }
 ```
 
-### Field Definitions
-
-- **fullName**: Person's complete name
-- **company**: Company or brand name
-- **intentScore**: 1-7 behavioral intent ranking
-- **webinarVslType**: Type of webinar/VSL funnel technology
-- **primaryPlatform**: Main social/digital platform (LinkedIn, Twitter, etc.)
-- **salesTeam**: Sales team structure (Setter, Closer, both, or none)
-- **primaryAds**: Active ad platforms (Facebook, Instagram, YouTube, Google)
-- **hiring**: Active job postings for sales/operations team
-- **theirBaby**: Name of their main paid product/coaching program
-
 ---
 
 ## 🔧 Configuration & Storage
 
-### Local Storage Keys
+### Environment Variables
 
-The system automatically saves to browser localStorage:
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3000` | HTTP port the backend listens on |
+| `GEMINI_MODEL` | `gemini-2.0-flash` | Gemini model ID |
+| `GOOGLE_APPLICATION_CREDENTIALS` | *(ADC default)* | Path to service-account JSON key |
 
-```javascript
-'gemini_api_key'    // Your API key (encrypted by browser)
-'target_niche'      // Last used niche keyword
-'target_leads'      // Last used lead count
-'lead_gen_history'  // All discovered leads by keyword
-```
+### Browser localStorage Keys
 
-### Environment Variables (.env)
+| Key | Description |
+|-----|-------------|
+| `target_niche` | Last used niche keyword |
+| `target_leads` | Last used lead count |
+| `lead_gen_history` | All discovered leads by keyword |
 
-For local development, create a `.env` file:
-
-```env
-GEMINI_API_KEY=your_key_here
-DEFAULT_NICHE=High-Ticket B2B Coaching
-DEFAULT_TARGET_LEADS=50
-```
+No API key is ever stored in the browser.
 
 ---
 
 ## 🏗️ Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      UI LAYER (HTML/CSS)                     │
-│  Configuration Panel | Activity Log | Results Table          │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-┌────────────────────┴────────────────────────────────────────┐
-│           EVENT MANAGER & ACTIVITY LOGGER (Layer 6)          │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-┌────────────────────┴────────────────────────────────────────┐
-│              EXECUTION ENGINE (Main Coordinator)              │
-└─────────┬──────────────┬──────────────┬─────────┬────────────┘
-          │              │              │         │
-     ┌────▼──┐    ┌──────▼──┐   ┌──────▼────┐   │
-     │ Config│    │ Batch   │   │ Gemini    │   │
-     │Manager│    │Calculator   │Integration   │   │
-     │(L1)   │    │(L3)     │   │Layer(L4)  │   │
-     └────────    └─────────┘   └───────────┘   │
-                                                  │
-              ┌──────────────────────────────────▼──┐
-              │ History & Dedup Manager (Layer 2)   │
-              │ - Global History Log                │
-              │ - Exclusion Lists                   │
-              └──────────────────────────────────────┘
-                                │
-                ┌───────────────▼────────────────┐
-                │ Results Aggregator (Layer 5)   │
-                │ - Combine Batches              │
-                │ - Final Dedup                  │
-                │ - CSV/JSON Export              │
-                └────────────────────────────────┘
+CDOD/
+├── index.html      # Main UI structure
+├── app.js          # Frontend execution engine (6 layers)
+├── styles.css      # Comprehensive styling + responsive
+├── server.js       # Node.js/Express backend proxy (ADC auth)
+├── package.json    # Node.js dependencies
+├── .env.example    # Environment variable template
+├── .gitignore      # Ignores .env, node_modules, etc.
+└── README.md       # This file
 ```
+
+### Backend API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/health` | GET | Verify ADC credentials and Gemini reachability |
+| `/api/generate` | POST `{ prompt }` | Generate leads via Gemini |
+| `/*` | GET | Serve static frontend files |
 
 ---
 
@@ -242,7 +273,7 @@ Load Historical Exclusions for Niche
         ↓
 FOR EACH BATCH:
   ├─ Build Dynamic Prompt (niche + batch size + exclusions)
-  ├─ Call Gemini API
+  ├─ POST /api/generate → server → Gemini API (ADC auth)
   ├─ Parse & Score Leads (filter score < 2)
   ├─ Check Exhaustion (empty response = halt)
   ├─ Add to History for Niche
@@ -259,10 +290,33 @@ Enable Export (CSV/JSON)
 
 ## 🛡️ Security & Privacy
 
-- **API Keys**: Never hardcoded. Loaded from `.env` (dev) or localStorage (browser)
-- **Local Storage**: All data stored locally in browser—no external servers
-- **No Tracking**: Zero analytics, no external calls except to Gemini API
-- **Git Protection**: `.env` in `.gitignore` prevents accidental commits
+- **No browser API keys** — authentication is handled server-side via ADC
+- **Credentials never reach the browser** — the server obtains a short-lived token from Google's metadata service or a service-account key and forwards it only on server-side requests
+- **Local storage** — lead history and config stored locally in the browser; no external databases
+- **No tracking** — zero analytics, no external calls except to the Gemini API (via the backend)
+- **Git protection** — `.env` and `node_modules` are in `.gitignore`
+
+---
+
+## 🐛 Troubleshooting
+
+### "Backend connection failed" / ADC error
+- Run `gcloud auth application-default login` (developer workstation)
+- Or set `GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json`
+- Ensure the **Generative Language API** is enabled in your GCP project
+
+### "Gemini API Error (403)"
+- The service account or ADC user may lack the required IAM role
+- Grant `roles/aiplatform.user` or `roles/ml.developer` to the principal
+
+### "No new qualified leads" (Early Exhaustion)
+- Niche may be too narrow — try broader keywords
+- All available leads may have been discovered — check history
+- Intent scoring threshold (≥2) may be filtering too aggressively
+
+### Server won't start
+- Ensure Node.js ≥ 18 is installed: `node --version`
+- Run `npm install` if `node_modules` is missing
 
 ---
 
@@ -270,78 +324,16 @@ Enable Export (CSV/JSON)
 
 The architecture is designed for seamless extension:
 
-### Proposed Part Two Structure
-
 ```javascript
 // Layer 7: Manus Enrichment Manager
 const ManusEnrichmentManager = {
-    // Takes leads from Part One output
     enrichLeads(leads) {
         // Call Manus API for additional data
-        // Email validation, company research, etc.
     },
-};
-
-// Layer 8: Unified Export Engine
-const UnifiedExportEngine = {
-    // Combines Part One + Part Two results
-    // Generates comprehensive lead profiles
 };
 ```
 
 **Integration Point**: `Part One Output` → `Manus Enrichment` → `Final Unified Dataset`
-
----
-
-## 🐛 Troubleshooting
-
-### "Invalid API Key" Error
-- Verify your Gemini API key at [aistudio.google.com](https://aistudio.google.com/app/apikeys)
-- Ensure key is entered correctly (copy-paste recommended)
-- Check your quota hasn't been exceeded
-
-### "No new qualified leads" (Early Exhaustion)
-- Niche may be too narrow—try broader keywords
-- All available leads may have been discovered—check history
-- Intent scoring threshold (≥2) may be filtering too much
-
-### Results Not Saving
-- Ensure browser allows localStorage (privacy mode may block it)
-- Check browser storage hasn't hit quota limit
-- Clear cache and refresh if experiencing issues
-
-### Slow Performance
-- Batch execution is sequential—large lead counts take time
-- Network connection affects Gemini API response times
-- Try smaller batches first (e.g., 50-100 leads)
-
----
-
-## 📦 Files Structure
-
-```
-CDOD/
-├── index.html          # Main UI structure
-├── app.js             # Complete execution engine (6 layers)
-├── styles.css         # Comprehensive styling + responsive
-├── .env.example       # Environment template
-├── .gitignore         # Ignore sensitive files
-└── README.md          # This file
-```
-
----
-
-## 🤝 Contributing
-
-This is Part One of a larger system. Future enhancements:
-
-- [ ] Part Two: Manus API Enrichment
-- [ ] Database integration for lead history
-- [ ] Advanced filtering & segmentation
-- [ ] Bulk email validation
-- [ ] LinkedIn integration
-- [ ] Webhook support for external apps
-- [ ] API endpoint wrapping
 
 ---
 
@@ -351,26 +343,6 @@ MIT License - Feel free to use and modify for your projects
 
 ---
 
-## 🎯 Next Steps
+**Built with ❤️ using vanilla JS, HTML5, CSS3, and Node.js**
 
-1. **Get your Gemini API key** → [aistudio.google.com/app/apikeys](https://aistudio.google.com/app/apikeys)
-2. **Open index.html** in your browser
-3. **Configure your niche** and target lead count
-4. **Click [Start]** and watch the magic happen
-5. **Export results** for your sales team
-
----
-
-## 📞 Support
-
-For issues or questions:
-1. Check the **Troubleshooting** section above
-2. Review the **Architecture Overview** to understand data flow
-3. Check browser console for detailed error logs
-4. Verify `.env` is set up correctly (if using local development)
-
----
-
-**Built with ❤️ using vanilla JS, HTML5, CSS3**
-
-*Ready to source high-intent B2B leads at scale.*
+*Ready to source high-intent B2B leads at scale — now with Google Cloud ADC.*
